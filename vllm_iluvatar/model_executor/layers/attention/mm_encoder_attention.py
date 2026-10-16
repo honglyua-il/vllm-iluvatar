@@ -152,7 +152,9 @@ class IluMMEncoderAttention(MMEncoderAttention):
                 eff_max_kv,
             )
         if padded_head > head_size:
-            out = out[..., :head_size]
+            # Slicing the padded head dim is non-contiguous. Audio encoders
+            # then ``view`` this tensor back to ``[seq, hidden]``.
+            out = out[..., :head_size].contiguous()
         if is_reshaped:
             out = out.reshape(bsz, q_len, -1)
         return out

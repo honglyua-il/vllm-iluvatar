@@ -190,6 +190,7 @@ def test_forward_fa_matches_torch_attention_with_head_padding(
     expected = _reference_attention(query, key, value, attn.scale)
     torch.testing.assert_close(output, expected, rtol=1e-5, atol=1e-6)
     assert output.shape == expected.shape
+    assert output.is_contiguous()
     assert calls == {
         "bf16": int(opt_level == 0),
         "all_int8": int(opt_level == 1),
