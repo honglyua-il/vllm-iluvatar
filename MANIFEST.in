@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright (c) 2026 Shanghai Iluvatar CoreX Semiconductor Co., Ltd.
+include LICENSE THIRD_PARTY_NOTICES.md AGENTS.md
+recursive-include licenses *.txt
+include docs/licensing/UPSTREAM_SOURCES.md
+include vllm_iluvatar/third_party/flash_linear_attention/LICENSE

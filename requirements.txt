@@ -1,0 +1,118 @@
+# ==============================================================================
+# vllm-iluvatar runtime requirements -- SINGLE SOURCE OF TRUTH.
+#
+# Mirrors vllm/requirements/common.txt + vllm/requirements/cuda.txt with the
+# iluvatar-only overrides described below.  This file feeds BOTH:
+#   * ``install_vllm_iluvatar.sh`` (runtime install), and
+#   * the wheel's ``Requires-Dist`` via ``setup.py:get_requirements()``.
+# It supersedes the former ``requirements/common.txt``, which had drifted from
+# this file (ray / diskcache / numba / loguru / pycountry / apache-tvm-ffi were
+# only here; llguidance / xgrammar / compressed-tensors were only there).
+#
+# Iluvatar deltas vs. upstream vllm/requirements/*.txt:
+#
+#   * ``numpy`` is pinned ``<2``.  CoreX torch is built against the NumPy 1.x
+#     C ABI, but its wheel METADATA declares no numpy dependency at all, so
+#     pip cannot infer the bound -- it has to be stated here (and mirrored in
+#     the image's PIP_CONSTRAINT file).
+#   * ``opencv-python-headless`` is held at 4.11.0.86.  Upstream asks for
+#     >= 4.13.0, but every release from 4.13 on declares ``numpy>=2``, which
+#     is unsatisfiable against the pin above.
+#   * ``mistral_common`` is pinned without upstream's ``[image]`` extra: that
+#     extra resolves opencv on its own and would fight the pin above.
+#   * ``compressed-tensors`` is held at 0.15.0.1 (upstream moved to 0.17.0).
+#   * ``apache-tvm-ffi`` is a floor rather than upstream's ``==0.1.10`` pin;
+#     it is pulled in by xgrammar.
+#   * ``transformers`` gains an upper bound ``< 5.15`` on top of upstream's
+#     ``>= 5.5.3`` floor.  ``vllm/model_executor/models/pixtral.py`` imports
+#     ``PixtralRotaryEmbedding`` at module load, and transformers dropped that
+#     symbol after the 5.14 series -- so a drifting base image (e.g. 5.17)
+#     breaks both Pixtral serving and test collection.  5.14.1 is vllm's own
+#     tested pin (vllm/requirements/test/*.txt); the cap keeps us on that
+#     series without hard-pinning a single patch release.
+#   * All torch / torchvision / torchaudio / torchcodec / nvidia-* /
+#     flashinfer / nvtx / quack / cutlass-dsl / tokenspeed / humming entries
+#     from cuda.txt are dropped -- CoreX platform, not NVIDIA.
+#   * ``tilelang`` and ``fastsafetensors`` are also dropped.  Both are guarded
+#     by optional-import shims upstream, and the iluvatar MHC path uses
+#     ixformer's ``ds4_mhc_pre_*`` kernels rather than the tilelang ones.
+#   * ``ray`` and ``diskcache`` are additions -- upstream 0.26.0 no longer
+#     lists ray in common.txt, and diskcache backs the outlines disk cache.
+#   * ``loguru`` / ``pycountry`` are transitive gap-fillers, kept explicit so
+#     the ``--no-deps`` install path in install_vllm_iluvatar.sh does not
+#     leave them out.  Extend that group (not the --no-deps list) when a new
+#     "X requires Y, which is not installed" surfaces at runtime.
+# ==============================================================================
+
+# ---- vllm/requirements/common.txt (upstream mirror) -------------------------
+regex # Replace re for higher-performance regex matching
+cachetools
+psutil
+sentencepiece  # Required for LLaMA tokenizer.
+numpy < 2 # iluvatar delta: CoreX torch is built against the NumPy 1.x C ABI
+ray
+requests >= 2.26.0
+tqdm
+blake3
+py-cpuinfo
+transformers >= 5.5.3, < 5.15 # iluvatar delta: 5.15+ dropped PixtralRotaryEmbedding used by pixtral.py at import time; 5.14.1 is vllm's tested pin
+tokenizers >= 0.21.1  # Required for fast incremental detokenization.
+safetensors >= 0.6.2  # MXFP4/MXFP6 dtype support (F8_E8M0, F4) added in 0.6.0: https://github.com/huggingface/safetensors/pull/611
+protobuf >= 5.29.6, !=6.30.*, !=6.31.*, !=6.32.*, !=6.33.0.*, !=6.33.1.*, !=6.33.2.*, !=6.33.3.*, !=6.33.4.* # Required by LlamaTokenizer, gRPC. CVE-2026-0994
+fastapi[standard] >= 0.133.0, < 0.137.0 # First version supporting Starlette 1.0; < 0.137.0 avoids route-tree change that breaks model-hosting-container-standards handler overrides.
+starlette >= 1.0.1 # CVE-2026-48710: Host header injection in < 1.0.1
+aiohttp >= 3.13.3
+openai >= 2.0.0  # For Responses API with reasoning content
+pydantic >= 2.12.0
+prometheus_client >= 0.18.0
+pillow  # Required for image processing
+prometheus-fastapi-instrumentator >= 8.0.0 # v8 unblocks starlette >= 1.0
+tiktoken >= 0.6.0  # Required for DBRX tokenizer
+lm-format-enforcer == 0.11.3
+llguidance >= 1.7.0, < 1.8.0; platform_machine == "x86_64" or platform_machine == "arm64" or platform_machine == "aarch64" or platform_machine == "ppc64le" or platform_machine == "s390x"
+outlines_core == 0.2.14
+diskcache == 5.6.3 # iluvatar delta: required for outlines backend disk cache
+lark == 1.2.2
+xgrammar >= 0.2.1, < 1.0.0; platform_machine == "x86_64" or platform_machine == "aarch64" or platform_machine == "arm64" or platform_machine == "s390x" or platform_machine == "ppc64le"
+typing_extensions >= 4.10
+filelock >= 3.16.1 # need to contain https://github.com/tox-dev/filelock/pull/317
+partial-json-parser # used for parsing partial JSON outputs
+jsonschema >= 4.23.0 # required for MiniMax M3 tool schema validation
+pyzmq >= 25.0.0
+msgspec
+mistral_common == 1.11.5 # iluvatar delta: upstream is mistral_common[image] >= 1.11.5; the [image] extra resolves opencv and fights the pin below
+opencv-python-headless == 4.11.0.86 # iluvatar delta: upstream >= 4.13.0, but 4.13+ declares numpy>=2
+pyyaml
+six>=1.16.0; python_version > '3.11' # transitive dependency of pandas that needs to be the latest version for python 3.12
+setuptools>=77.0.3,<81.0.0; python_version > '3.11' # Setuptools is used by triton, we need to ensure a modern version is installed for 3.12+ so that it does not try to import distutils, which was removed in 3.12
+einops # Required for Qwen2-VL.
+compressed-tensors == 0.15.0.1 # iluvatar delta: upstream is == 0.17.0
+depyf==0.20.0 # required for profiling and debugging with compilation config
+cloudpickle # allows pickling lambda functions in model_executor/models/registry.py
+watchfiles # required for http server to monitor the updates of TLS files
+python-json-logger # Used by logging as per examples/features/logging_configuration.md
+ninja # Required for xgrammar, rocm, tpu, xpu
+pybase64 # fast base64 implementation
+cbor2 # Required for cross-language serialization of hashable objects
+ijson # Required for mistral streaming tool parser
+setproctitle # Used to set process names for better debugging and monitoring
+openai-harmony >= 0.0.3  # Required for gpt-oss
+anthropic >= 0.71.0
+model-hosting-container-standards >= 0.1.14, < 1.0.0
+mcp
+opentelemetry-sdk >= 1.27.0
+opentelemetry-api >= 1.27.0
+opentelemetry-exporter-otlp >= 1.27.0
+opentelemetry-semantic-conventions-ai >= 0.4.1
+
+# ---- vllm/requirements/cuda.txt (upstream mirror, iluvatar-adapted) ---------
+numba == 0.65.0 # Required for N-gram speculative decoding
+apache-tvm-ffi>=0.1.9 # pulled in by xgrammar; upstream cuda.txt pins == 0.1.10
+# All nvidia-* / torch / torchvision / torchaudio / torchcodec / flashinfer /
+# nvtx / tokenspeed / humming / quack / cutlass entries from upstream cuda.txt
+# are dropped (NVIDIA-only, not applicable to the CoreX platform), as are
+# tilelang and fastsafetensors (optional imports, unused on this platform).
+
+# ---- iluvatar transitive gap-fillers ----------------------------------------
+loguru # compressed-tensors imports loguru at module load for logging
+pycountry # mistral_common -> pydantic_extra_types.language_code -> pycountry

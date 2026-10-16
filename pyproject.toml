@@ -1,0 +1,88 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vllm_iluvatar"
+description = "Iluvatar CoreX plugin package for vLLM (out-of-tree platform plugin)"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+# torch / ixformer are provided by the corex environment, not installed via pip.
+# Runtime deps are resolved dynamically in setup.py from requirements.txt.
+dynamic = ["version", "dependencies"]
+
+[project.entry-points."vllm.platform_plugins"]
+iluvatar = "vllm_iluvatar:register_platform"
+
+[project.entry-points."vllm.general_plugins"]
+iluvatar = "vllm_iluvatar:register_general"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["vllm_iluvatar*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Ensure the repo root is importable so test modules can resolve the installed
+# plugin package and local helpers regardless of invocation cwd.
+pythonpath = ["."]
+
+[tool.ruff.lint.per-file-ignores]
+"vllm_iluvatar/version.py" = ["F401"]
+"vllm_iluvatar/_git_id.py" = ["ALL"]
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-implicit-str-concat
+    "ISC",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # flake8-logging-format
+    "G",
+]
+ignore = [
+    # star imports
+    "F405", "F403",
+    # lambda expression assignment
+    "E731",
+    # zip without `strict=`
+    "B905",
+    # Loop control variable not used within loop body
+    "B007",
+    # f-string format
+    "UP032",
+    # line-length: handled by ruff-format; long strings/URLs it can't wrap
+    # should not hard-fail the commit (matches the formatter-only workflow).
+    "E501",
+]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.typos.default.extend-identifiers]
+# Functional scale-format literal (compared against quant config); not a typo.
+ue8m0 = "ue8m0"
+
+[tool.typos.default.extend-words]
+# MOE (Mixture of Experts) + W (Weight); typos splits IluMOEW16A16 into sub-words.
+MOEW = "MOEW"
+# ``mis-unpacked`` is intentional: "incorrectly unpacked".
+mis = "mis"
+# UE8M0 is a scale-format literal used by fp8_ds_mla layouts.
+UE = "UE"
+# Existing GDN metadata uses ``*_indx`` field names; keep the spelling stable.
+indx = "indx"
+# ``arange`` (torch.arange / np.arange) is a valid API name, not ``arrange``.
+arange = "arange"
+# GDN fused beta/alpha projection: ``in_proj_ba``, ``split_ba``, local ``ba``.
+ba = "ba"
